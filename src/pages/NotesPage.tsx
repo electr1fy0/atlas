@@ -1,6 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import supabase from "../client/supabase";
 import type { Session } from "@supabase/supabase-js";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  PencilEdit02Icon,
+  LogoutSquare01Icon,
+} from "@hugeicons/core-free-icons";
 
 interface Note {
   id?: string;
@@ -9,6 +14,8 @@ interface Note {
   created_at?: string;
   modified_at?: string;
 }
+
+type Pos = { x: number; y: number } | null;
 
 export default function NotesPage() {
   const [currTitle, setCurrTitle] = useState<string>("");
@@ -20,6 +27,11 @@ export default function NotesPage() {
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
+  const [pos, setPos] = useState<Pos>(null);
+
+  const handleSignout = () => {
+    supabase.auth.signOut();
+  };
   const filteredNotes = notes.filter((note) => {
     const query = searchText.toLowerCase().trim();
     if (!query) return true;
@@ -28,6 +40,12 @@ export default function NotesPage() {
       note.content.toLowerCase().includes(query)
     );
   });
+
+  function handleContext(e: React.MouseEvent) {
+    e.preventDefault();
+    setPos({ x: e.clientX, y: e.clientY });
+    console.log(e.clientX, e.clientY);
+  }
 
   const fetchTasks = async (): Promise<Note[] | null> => {
     const { data: notes, error } = await supabase
@@ -94,9 +112,18 @@ export default function NotesPage() {
     setCurrTitle("");
     setCurrID("");
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.error("No authenticated user");
+      return;
+    }
+
     const { error, data } = await supabase
       .from("notes")
-      .insert({ title: "", content: "" })
+      .insert({ title: "", content: "", author_id: user.id })
       .select()
       .single();
 
@@ -115,16 +142,44 @@ export default function NotesPage() {
 
   return (
     <div className="w-full flex h-screen overflow-hidden">
+      {/* Context Menu */}
+      {pos && (
+        <div
+          className="fixed bg-white border-neutral-200 p-4 rounded-md duration-300"
+          style={{ top: pos.y, left: pos.x }}
+        >
+          <ul className="text-sm text-neutral-600">
+            <li>Meow</li>
+            <li>Meow</li>
+            <li>Meow</li>
+            <li>Meow</li>
+            <li>Meow</li>
+          </ul>
+        </div>
+      )}
       {/* Sidebar */}
       <div className="w-80 flex flex-col justify-start  h-full bg-[#1D1E20] border-r border-[#2D2D2F]">
         <div className="py-6 px-4 shrink-0">
           <div className="flex justify-between items-center gap-4 text-neutral-400 px-2 py-1.5 text-xl">
-            <h1 className="font-medium text-xl">atlas</h1>
-            <div
-              className="rounded-md border border-neutral-700 size-6 hover:bg-neutral-200 duration-100 flex items-center justify-center hover:text-neutral-700 cursor-pointer"
-              onClick={createNote}
-            >
-              <span className="pb-0.5">+</span>
+            <h1 className="font-medium text-xl font-geist-mono">atlas</h1>
+            <div className="flex gap-2">
+              <div
+                className="rounded-md p-1 hover:bg-[#262628] duration-100 flex items-center justify-center  cursor-pointer"
+                onClick={createNote}
+              >
+                <span className="">
+                  <HugeiconsIcon icon={PencilEdit02Icon} size={22} />
+                </span>
+              </div>{" "}
+              <div
+                className="rounded-md p-1 hover:bg-[#262628] duration-100 flex items-center justify-center  cursor-pointer"
+                onClick={handleSignout}
+              >
+                <span className="">
+                  {/*<HugeiconsIcon icon={PencilEdit02Icon} size={22} />*/}
+                  <HugeiconsIcon icon={LogoutSquare01Icon} size={21} />
+                </span>
+              </div>
             </div>
           </div>
           <input
@@ -149,6 +204,7 @@ export default function NotesPage() {
                   if (note.id) setCurrID(note.id);
                   titleRef.current?.focus();
                 }}
+                onContextMenu={(e) => handleContext(e)}
               >
                 <span className=" min-h-6">
                   {note.title === "" ? "New Note" : note.title}
@@ -168,7 +224,6 @@ export default function NotesPage() {
           ))}
         </ul>
       </div>
-
       {/* Note Area */}
       <div className="flex-1 flex flex-col h-full px-12 py-10 md:py-12 overflow-hidden">
         <form
