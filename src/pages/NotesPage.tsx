@@ -52,6 +52,8 @@ export default function NotesPage() {
       return;
     }
 
+    setCurrContent(notes[0] ? notes[0].content : "");
+    setCurrTitle(notes[0] ? notes[0].title : "");
     await fetchTasks();
   };
 
@@ -159,10 +161,11 @@ export default function NotesPage() {
               value={currTitle}
               ref={titleRef}
               className="h-14 outline-0 text-2xl"
-              onContextMenu={(e) => {
-                e.preventDefault();
-
-                handleDelete();
+              onKeyDownCapture={(e) => {
+                if (e.key === "Backspace" && e.metaKey) {
+                  e.preventDefault();
+                  handleDelete();
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
