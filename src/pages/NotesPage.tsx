@@ -15,7 +15,6 @@ export default function NotesPage() {
   const [currTitle, setCurrTitle] = useState<string>("");
   const [currContent, setCurrContent] = useState<string>("");
   const [currID, setCurrID] = useState<string>("");
-
   const [notes, setNotes] = useState<Note[]>([]);
 
   const [session, setSession] = useState<Session | null>(null);
@@ -24,6 +23,14 @@ export default function NotesPage() {
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
+  const filteredNotes = notes.filter((note) => {
+    const query = searchText.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      note.title.toLowerCase().includes(query) ||
+      note.content.toLowerCase().includes(query)
+    );
+  });
   const fetchTasks = async () => {
     const { data: notes, error } = await supabase
       .from("notes")
@@ -45,6 +52,28 @@ export default function NotesPage() {
     fetchTasks();
   }, []);
 
+  useEffect(() => {
+    if (!currID) return;
+
+    const delayDebounceFn = setTimeout(async () => {
+      const note: Note = { title: currTitle, content: currContent };
+
+      const { error } = await supabase
+        .from("notes")
+        .update(note)
+        .eq("id", currID);
+
+      if (error) {
+        console.error("failed to submit note:", error.message);
+        return;
+      }
+
+      fetchTasks();
+    }, 2000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [currTitle, currContent, currID]);
+
   const handleDelete = async () => {
     const { error } = await supabase.from("notes").delete().eq("id", currID);
     if (error) {
@@ -55,23 +84,6 @@ export default function NotesPage() {
     setCurrContent(notes[0] ? notes[0].content : "");
     setCurrTitle(notes[0] ? notes[0].title : "");
     await fetchTasks();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const note: Note = { title: currTitle, content: currContent };
-    const { error } = await supabase
-      .from("notes")
-      .update(note)
-      .eq("id", currID);
-
-    if (error) {
-      console.error("failed to submit note:", error.message);
-      return;
-    }
-
-    fetchTasks();
   };
 
   const createNote = async () => {
@@ -101,10 +113,10 @@ export default function NotesPage() {
       {/* Sidebar*/}
       <div className="">
         <div className="py-8 w-80 bg-[#1D1E20] px-4 h-screen">
-          <div className="flex justify-between items-center gap-4 text-neutral-400 px-4 py-1.5 text-xl">
+          <div className="flex justify-between items-center gap-4 text-neutral-400  px-2 py-1.5 text-xl">
             <h1 className="font-medium text-xl">atlas</h1>
             <div
-              className="rounded-md border size-6 hover:bg-neutral-200 flex items-center justify-center  hover:text-neutral-700 "
+              className="rounded-md border size-6 hover:bg-neutral-200  duration-100 flex items-center justify-center  hover:text-neutral-700 "
               onClick={createNote}
             >
               <span className="pb-0.5">+</span>
@@ -114,15 +126,17 @@ export default function NotesPage() {
             className="rounded-lg px-4 py-1.5 w-full my-4 bg-[#2D2D2F] outline-0 text-neutral-400"
             placeholder="Search..."
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+            }}
             name="search-bar"
           ></input>
           <ul className="rounded-lg ">
-            {notes.map((note) => {
+            {filteredNotes.map((note) => {
               return (
                 <div key={note.id}>
                   <li
-                    className={`hover: ${note.id == currID ? "bg-[#2E2F31]" : ""}  text-[#D0D1D3] rounded-lg px-3 py-3 w-full`}
+                    className={`hover: ${note.id == currID ? "bg-[#2E2F31]" : ""}  text-[#D0D1D3] rounded-lg px-4 min-h-16 pt-3 pb-3 w-full`}
                   >
                     <button
                       onClick={() => {
@@ -133,12 +147,15 @@ export default function NotesPage() {
                       }}
                       className="w-full h-full"
                     >
-                      <span className="block text-left"> {note.title}</span>
-                      <div className="flex justify-between text-left text-sm items-center w-full text-neutral-400">
-                        <span className="content-preview overflow-hidden ">
+                      <span className="block text-left min-h-6">
+                        {" "}
+                        {note.title}
+                      </span>
+                      <div className="flex justify-between text-left text-sm items-center h-full w-full text-neutral-400">
+                        <span className="content-preview overflow-hidden h-full w-full">
                           {note.content}
                         </span>
-                        <span>
+                        <span className="text-xs h-full">
                           {note.modified_at &&
                             new Date(note.modified_at).toLocaleDateString()}
                         </span>
@@ -155,7 +172,7 @@ export default function NotesPage() {
       {/* Notes area*/}
       <div className="flex justify-start items-center flex-1  md:m-20">
         <div className="h-full max-w-1/2 area">
-          <form className="flex flex-col" onSubmit={handleSubmit}>
+          <form className="flex flex-col">
             <input
               onChange={(e) => setCurrTitle(e.target.value)}
               value={currTitle}
@@ -180,12 +197,6 @@ export default function NotesPage() {
               value={currContent}
               className=" h-full resize-none outline-none text-neutral-700"
             />
-            <button
-              type="submit"
-              className="py-1.5 px-3 rounded-md bg-neutral-900 hover:bg-neutral-700  text-neutral-300"
-            >
-              Update Note
-            </button>
           </form>
         </div>
       </div>
