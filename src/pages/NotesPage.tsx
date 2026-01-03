@@ -31,7 +31,7 @@ export default function NotesPage() {
       note.content.toLowerCase().includes(query)
     );
   });
-  const fetchTasks = async () => {
+  const fetchTasks = async (): Promise<Note[] | null> => {
     const { data: notes, error } = await supabase
       .from("notes")
       .select("*")
@@ -39,17 +39,21 @@ export default function NotesPage() {
 
     if (error) {
       console.error("error fetching notes:");
-      return;
+      return null;
     }
-    if (!notes) {
-      console.error("fetched notes is null for some reason");
-      return;
-    }
-    setNotes(notes);
+
+    return notes;
   };
 
   useEffect(() => {
-    fetchTasks();
+    (async () => {
+      const fetchedTasks = await fetchTasks();
+      if (!fetchedTasks) {
+        console.error("notes is null for some reason");
+        return;
+      }
+      setNotes(fetchedTasks);
+    })();
   }, []);
 
   useEffect(() => {
@@ -68,7 +72,12 @@ export default function NotesPage() {
         return;
       }
 
-      fetchTasks();
+      const fetchedTasks = await fetchTasks();
+      if (!fetchedTasks) {
+        console.error("notes is null for some reason");
+        return;
+      }
+      setNotes(fetchedTasks);
     }, 2000);
 
     return () => clearTimeout(delayDebounceFn);
@@ -81,12 +90,21 @@ export default function NotesPage() {
       return;
     }
 
-    setCurrContent(notes[0] ? notes[0].content : "");
-    setCurrTitle(notes[0] ? notes[0].title : "");
-    await fetchTasks();
+    const fetchedTasks = await fetchTasks();
+    if (!fetchedTasks) {
+      console.error("notes is null for some reason");
+      return;
+    }
+    setNotes(fetchedTasks);
+
+    setCurrID(fetchedTasks[0] ? (fetchedTasks[0].id ?? "") : "");
+    setCurrContent(fetchedTasks[0] ? fetchedTasks[0].content : "");
+    setCurrTitle(fetchedTasks[0] ? fetchedTasks[0].title : "");
   };
 
   const createNote = async () => {
+    setCurrContent("");
+    setCurrTitle("");
     const { error, data } = await supabase
       .from("notes")
       .insert({ title: currTitle, content: currContent })
@@ -97,8 +115,6 @@ export default function NotesPage() {
       console.error("failed to submit note:", error?.message || data);
       return;
     }
-    setCurrContent("");
-    setCurrTitle("");
     setCurrID(data.id);
 
     setNotes((prev) => [data, ...prev]);
@@ -136,7 +152,7 @@ export default function NotesPage() {
               return (
                 <div key={note.id}>
                   <li
-                    className={`hover: ${note.id == currID ? "bg-[#2E2F31]" : ""}  text-[#D0D1D3] rounded-lg px-4 min-h-16 pt-3 pb-3 w-full`}
+                    className={`hover: ${note.id == currID ? "bg-[#2E2F31]" : ""}  text-[#D0D1D3] rounded-lg px-4 min-h-18 pt-3 pb-3 w-full`}
                   >
                     <button
                       onClick={() => {
@@ -151,8 +167,8 @@ export default function NotesPage() {
                         {" "}
                         {note.title}
                       </span>
-                      <div className="flex justify-between text-left text-sm items-center h-full w-full text-neutral-400">
-                        <span className="content-preview overflow-hidden h-full w-full">
+                      <div className="flex justify-between text-left text-sm items-start gap-y-2 h-full w-full text-neutral-500 flex-col">
+                        <span className="content-preview line-clamp-1 h-full w-full">
                           {note.content}
                         </span>
                         <span className="text-xs h-full">
@@ -170,35 +186,33 @@ export default function NotesPage() {
         </div>
       </div>
       {/* Notes area*/}
-      <div className="flex justify-start items-center flex-1  md:m-20">
-        <div className="h-full max-w-1/2 area">
-          <form className="flex flex-col">
-            <input
-              onChange={(e) => setCurrTitle(e.target.value)}
-              value={currTitle}
-              ref={titleRef}
-              className="h-14 outline-0 text-2xl"
-              onKeyDownCapture={(e) => {
-                if (e.key === "Backspace" && e.metaKey) {
-                  e.preventDefault();
-                  handleDelete();
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  contentRef.current?.focus();
-                }
-              }}
-            />
-            <textarea
-              ref={contentRef}
-              onChange={(e) => setCurrContent(e.target.value)}
-              value={currContent}
-              className=" h-full resize-none outline-none text-neutral-700"
-            />
-          </form>
-        </div>
+      <div className="flex justify-start items-center flex-col flex-1  h-screen px-12 py-10 8 md:py-12">
+        <form className="flex flex-col h-full  max-w-xl w-full ">
+          <input
+            onChange={(e) => setCurrTitle(e.target.value)}
+            value={currTitle}
+            ref={titleRef}
+            className="h-14 outline-0 text-2xl"
+            onKeyDownCapture={(e) => {
+              if (e.key === "Backspace" && e.metaKey) {
+                e.preventDefault();
+                handleDelete();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                contentRef.current?.focus();
+              }
+            }}
+          />
+          <textarea
+            ref={contentRef}
+            onChange={(e) => setCurrContent(e.target.value)}
+            value={currContent}
+            className=" resize-none flex-1 block h-[60vh] outline-none text-neutral-700"
+          />
+        </form>
       </div>
     </div>
   );
