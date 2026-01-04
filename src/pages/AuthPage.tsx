@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import supabase from "../client/supabase";
-import type { Session, User } from "@supabase/supabase-js";
+
 
 interface Creds {
   email: string;
@@ -18,9 +18,14 @@ export default function AuthPage() {
 
     if (isLogin) {
       const resp = await supabase.auth.signInWithPassword(creds);
-      console.log("signin resp", resp);
+      if (resp.error) {
+        console.error("failed to signin:", resp.error.message);
+      }
     } else {
-      console.log("unimplemented signup");
+      const resp = await supabase.auth.signUp(creds);
+      if (resp.error) {
+        console.error("failed to signin:", resp.error.message);
+      }
     }
   };
 
